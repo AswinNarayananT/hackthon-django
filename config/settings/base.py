@@ -86,6 +86,7 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     "hirethon_template.users",
+    "hirethon_template.shorturl",
     # Your stuff: custom apps go here
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
@@ -328,7 +329,7 @@ REST_FRAMEWORK = {
 }
 
 # django-cors-headers - https://github.com/adamchainz/django-cors-headers#setup
-CORS_URLS_REGEX = r"^/api/.*$"
+CORS_URLS_REGEX = r"^/(api|shorturl|users)/.*$"
 
 # Celery 6 compatibility: ensure retry on startup remains enabled
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
@@ -345,8 +346,11 @@ REST_AUTH = {
     "USE_JWT": True,
     "JWT_AUTH_COOKIE": "access_token",
     "JWT_AUTH_REFRESH_COOKIE": "refresh_token",
-    "JWT_AUTH_HTTPONLY": False,
+    "JWT_AUTH_HTTPONLY": True,  # HTTP-only cookies for security
     "JWT_AUTH_SAMESITE": "Lax",
+    "JWT_AUTH_SECURE": False,  # Set to True in production with HTTPS
+    "JWT_AUTH_COOKIE_USE_CSRF": False,  # Disable CSRF for JWT cookies
+    "JWT_AUTH_REFRESH_COOKIE_USE_CSRF": False,
     "SESSION_LOGIN": False,
 }
 
@@ -364,6 +368,8 @@ CLOUDFRONT_DOMAIN = env("CLOUDFRONT_DOMAIN", default="")
 
 # Update CORS settings
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # React frontend
+    "http://localhost:3000",  # Alternative React port
     "https://staging.app.hirethon_template.in",
     "https://app.hirethon_template.in",
     "https://*.hirethon_template.in",
@@ -394,4 +400,14 @@ CORS_ALLOW_HEADERS = [
     "user-agent",
     "x-csrftoken",
     "x-requested-with",
+]
+
+# CSRF settings for React frontend
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://staging.app.hirethon_template.in",
+    "https://app.hirethon_template.in",
+    "https://staging.app.hirethon_template.com",
+    "https://app.hirethon_template.com",
 ]

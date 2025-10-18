@@ -4,8 +4,138 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import DetailView, RedirectView, UpdateView
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.contrib.auth import authenticate
+from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
+from hirethon_template.users.models import User
+from hirethon_template.users.api.serializers import UserSerializer, RegisterSerializer
 
 User = get_user_model()
+
+
+class CustomLoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        print(request.data)
+        email = request.data.get('email')
+        password = request.data.get('password')
+
+        if not email or not password:
+            return Response({'detail': 'Email and password required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = authenticate(request, email=email, password=password)
+        if not user:
+            return Response({'detail': 'Invalid credentials'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Create tokens
+        refresh = RefreshToken.for_user(user)
+        access = str(refresh.access_token)
+
+        # Set refresh token in HTTP-only cookie
+        response = Response({
+            'access': access,
+            'user': UserSerializer(user, context={'request': request}).data
+        }, status=status.HTTP_200_OK)
+        response.set_cookie(
+            key='refresh_token',
+            value=str(refresh),
+            httponly=True,
+            samesite='Lax',  # adjust according to frontend domain
+            secure=False  # set True in production HTTPS
+        )
+        return response
+
+
+class CustomRefreshTokenView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        # Get refresh token from cookie
+        refresh_token = request.COOKIES.get('refresh_token')
+        
+        if not refresh_token:
+            return Response(
+                {'detail': 'Refresh token not found'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        try:
+            # Validate and refresh the token
+            refresh = RefreshToken(refresh_token)
+            access_token = str(refresh.access_token)
+            
+            # Get user from token payload
+            user_id = refresh.payload.get('user_id')
+            user = User.objects.get(id=user_id)
+            
+            # Return new access token
+            response = Response({
+                'access': access_token
+            }, status=status.HTTP_200_OK)
+            
+            # Optionally rotate refresh token (recommended for security)
+            new_refresh = RefreshToken.for_user(user)
+            response.set_cookie(
+                key='refresh_token',
+                value=str(new_refresh),
+                httponly=True,
+                samesite='Lax',
+                secure=False  # set True in production HTTPS
+            )
+            
+            return response
+            
+        except TokenError as e:
+            return Response(
+                {'detail': 'Invalid or expired refresh token'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+
+class CustomRegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create user
+        user = serializer.save()
+        
+        # Create tokens
+        refresh = RefreshToken.for_user(user)
+        access = str(refresh.access_token)
+        
+        # Set refresh token in HTTP-only cookie
+        response = Response({
+            'access': access,
+            'user': UserSerializer(user, context={'request': request}).data
+        }, status=status.HTTP_201_CREATED)
+        response.set_cookie(
+            key='refresh_token',
+            value=str(refresh),
+            httponly=True,
+            samesite='Lax',
+            secure=False  # set True in production HTTPS
+        )
+        return response
+
+
+class CustomLogoutView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        response = Response({'detail': 'Successfully logged out'}, status=status.HTTP_200_OK)
+        # Clear the refresh token cookie
+        response.delete_cookie('refresh_token')
+        return response
 
 
 class UserDetailView(LoginRequiredMixin, DetailView):
