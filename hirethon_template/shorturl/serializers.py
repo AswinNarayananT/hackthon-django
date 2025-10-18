@@ -22,6 +22,8 @@ class OrganizationCreateSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         user = self.context['request'].user
+        
+        # Create organization using Django ORM
         organization = Organization.objects.create(
             name=validated_data['name'],
             created_by=user

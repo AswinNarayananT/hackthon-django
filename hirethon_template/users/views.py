@@ -4,6 +4,7 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import DetailView, RedirectView, UpdateView
+from django.db import transaction
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -13,6 +14,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from hirethon_template.users.models import User
 from hirethon_template.users.api.serializers import UserSerializer, RegisterSerializer
+from hirethon_template.shorturl.models import Organization, Membership
 
 User = get_user_model()
 
@@ -106,26 +108,48 @@ class CustomRegisterView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create user
-        user = serializer.save()
-        
-        # Create tokens
-        refresh = RefreshToken.for_user(user)
-        access = str(refresh.access_token)
-        
-        # Set refresh token in HTTP-only cookie
-        response = Response({
-            'access': access,
-            'user': UserSerializer(user, context={'request': request}).data
-        }, status=status.HTTP_201_CREATED)
-        response.set_cookie(
-            key='refresh_token',
-            value=str(refresh),
-            httponly=True,
-            samesite='Lax',
-            secure=False  # set True in production HTTPS
-        )
-        return response
+        # Use transaction to ensure user and organization are created together
+        try:
+            with transaction.atomic():
+                # Create user
+                user = serializer.save()
+                
+                # Create default organization for the user
+                org_name = f"{user.name}'s Organization" if user.name else f"{user.email.split('@')[0]}'s Organization"
+                organization = Organization.objects.create(
+                    name=org_name,
+                    created_by=user
+                )
+                
+                # Add user as admin member of the organization
+                Membership.objects.create(
+                    user=user,
+                    organization=organization,
+                    role='admin'
+                )
+                
+                # Create tokens
+                refresh = RefreshToken.for_user(user)
+                access = str(refresh.access_token)
+                
+                # Set refresh token in HTTP-only cookie
+                response = Response({
+                    'access': access,
+                    'user': UserSerializer(user, context={'request': request}).data
+                }, status=status.HTTP_201_CREATED)
+                response.set_cookie(
+                    key='refresh_token',
+                    value=str(refresh),
+                    httponly=True,
+                    samesite='Lax',
+                    secure=False  # set True in production HTTPS
+                )
+                return response
+        except Exception as e:
+            return Response(
+                {'detail': f'Registration failed: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class CustomLogoutView(APIView):

@@ -80,3 +80,23 @@ def organization_namespaces(request, pk):
     namespaces = organization.namespaces.all()
     serializer = NamespaceSerializer(namespaces, many=True, context={'request': request})
     return Response(serializer.data)
+
+
+class NamespaceCreateAPIView(generics.CreateAPIView):
+    """API view to create a namespace"""
+    serializer_class = NamespaceSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def perform_create(self, serializer):
+        organization_id = self.request.data.get('organization')
+        organization = get_object_or_404(Organization, pk=organization_id)
+        
+        # Check if user is admin of this organization
+        membership = organization.memberships.filter(user=self.request.user, role='admin').first()
+        if not membership and organization.created_by != self.request.user:
+            return Response(
+                {'error': 'Only admins can create namespaces.'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer.save(created_by=self.request.user, organization=organization)

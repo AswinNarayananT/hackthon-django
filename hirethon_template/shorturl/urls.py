@@ -8,4 +8,7 @@ urlpatterns = [
     path("organizations/<int:pk>/", views.OrganizationDetailAPIView.as_view(), name="organization_detail"),
     path("organizations/<int:pk>/members/", views.organization_members, name="organization_members"),
     path("organizations/<int:pk>/namespaces/", views.organization_namespaces, name="organization_namespaces"),
+    
+    # Namespace API URLs
+    path("namespaces/", views.NamespaceCreateAPIView.as_view(), name="namespace_create"),
 ]
