@@ -1,12 +1,12 @@
 
 # define an alias for the specific python version used in this file.
-FROM vikasy/hirethon-base:latest
+FROM cookiecutter-django-base:latest
 
 ARG BUILD_ENVIRONMENT=local
 ARG APP_HOME=/app
-ENV PYTHONUNBUFFERED 1
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV BUILD_ENV ${BUILD_ENVIRONMENT}
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV BUILD_ENV=${BUILD_ENVIRONMENT}
 
 WORKDIR ${APP_HOME}
 
@@ -28,7 +28,9 @@ COPY --chown=django:django ./compose/local/django/entrypoint /entrypoint
 COPY --chown=django:django ./compose/local/django/start /start
 COPY --chown=django:django ./compose/local/django/celery/worker/start /start-celeryworker
 COPY --chown=django:django ./compose/local/django/celery/beat/start /start-celerybeat
+COPY --chown=django:django ./compose/local/django/celery/flower/start /start-flower
 RUN chmod +x /start-celeryworker /start-celerybeat
+RUN chmod +x /start-flower
 RUN chmod +x /entrypoint /start
 
 ENTRYPOINT ["/entrypoint"]

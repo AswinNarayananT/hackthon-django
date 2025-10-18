@@ -2,8 +2,8 @@
 # ------------------------------------------------------------------------------
 POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
-POSTGRES_DB=hirethon_template_db
-POSTGRES_USER=hirethon_template_user
-POSTGRES_PASSWORD=hirethon_template_password
+POSTGRES_DB=hackathon_db
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=aswinnt0017
 
-DATABASE_URL=postgresql://hirethon_template_user:hirethon_template_password@postgres:5432/hirethon_template_db
+DATABASE_URL=postgresql://postgres:aswinnt0017@postgres:5432/hackathon_db
